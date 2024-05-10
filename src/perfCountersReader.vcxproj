@@ -146,9 +146,6 @@
     <ClCompile Include="CWinServices.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Readme.md" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="CAppSettings.h" />
     <ClInclude Include="CExample.h" />
   </ItemGroup>

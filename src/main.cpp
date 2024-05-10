@@ -70,7 +70,7 @@ int main(int argc, char** argv)
         CPdhQuery pdhQuery(
             // https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc780836(v=ws.10)
             //std::tstring(_T("\\Process(firefox*)\\ID Process"))
-            GetMetricsList(settings.Get()->metrics),
+            GetMetricsList(settings.Get()->processMetrics),
 
             // https://learn.microsoft.com/en-us/dotnet/framework/debug-trace-profile/performance-counters
             //std::tstring(_T("\\Process(*)\\.NET CLR Memory\\Process ID"))
@@ -85,7 +85,8 @@ int main(int argc, char** argv)
             //tstring(L"\\Processor(*)\\% Processor Time")
             //tstring(_T("\\Processor(*)\\Interrupts/sec"))
             //tstring(L"\\Processor(_Total)\\Interrupts/sec")
-            parentProcessPID
+            parentProcessPID,
+            settings.Get()->processName
         );
         for (int i = 0; i < 100; ++i)
         {

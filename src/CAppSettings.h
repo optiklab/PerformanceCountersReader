@@ -13,8 +13,9 @@ using json = nlohmann::json;
 class CAppConfig
 {
 public:
-	std::tstring processName;
 	std::tstring serviceName;
+	std::tstring processName;
+	std::tstring processMetrics;
 	std::tstring metrics;
 };
 
@@ -70,9 +71,9 @@ private:
 		std::wstring wserviceName(serviceName.begin(), serviceName.end());
 		m_config->serviceName = wserviceName;
 
-		auto metrics = jsonData["metrics"].get<std::string>();
-		std::wstring wmetrics(metrics.begin(), metrics.end());
-		m_config->metrics = wmetrics;
+		auto processMetrics = jsonData["processMetrics"].get<std::string>();
+		std::wstring wprocessMetrics(processMetrics.begin(), processMetrics.end());
+		m_config->processMetrics = wprocessMetrics;
 
 		return m_config;
 	}

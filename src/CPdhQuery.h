@@ -18,13 +18,21 @@ using namespace std;
 class CPdhQuery
 {
 private:
+    DWORD m_parentProcessPID;
+
+    // Must have process metric
+    std::tstring m_processName;
+    std::tstring m_searchInstance;
     PDH_HQUERY m_pdhQuery;
     PDH_STATUS m_pdhStatus;
     PDH_HCOUNTER m_pdhCounter;
-    std::tstring m_searchInstance;
-    DWORD m_parentProcessPID;
-    //std::tstring m_counterPath;
-    vector<std::tstring> m_counterPaths;
+
+    // User defined/desired process metrics.
+    vector<std::tstring> m_processMetrics;
+
+    // User defined/desired metrics queries and counters.
+    vector<PDH_HQUERY> m_queries;
+    vector<PDH_HCOUNTER> m_counters;
 
 public:
 
@@ -39,40 +47,83 @@ public:
     };
 
     //! Constructor
-    explicit CPdhQuery(vector<std::tstring> counterPaths, DWORD parentProcessPID)
+    explicit CPdhQuery(vector<std::tstring> processMetrics, DWORD parentProcessPID, tstring processName)
         : m_pdhQuery(NULL)
         , m_pdhStatus(ERROR_SUCCESS)
         , m_pdhCounter(NULL)
-        , m_counterPaths(counterPaths)
+        , m_processMetrics(processMetrics)
         , m_parentProcessPID(parentProcessPID)
+        , m_processName(processName)
     {
-        if (m_pdhStatus = PdhOpenQuery(NULL, 0, &m_pdhQuery))
+        m_searchInstance = _T("\\Process(") + m_processName + _T(")\\ID Process");
+
+        for (int i = 0; i < m_processMetrics.size(); i++)
         {
-            throw CException(GetErrorString(m_pdhStatus));
+            m_processMetrics[i] = _T("\\Process(") + m_processName + _T(")\\") + m_processMetrics[i];
         }
 
+        if (m_pdhStatus = PdhOpenQuery(NULL, 0, &m_pdhQuery))
+        {
+            throw CException(GetErrorString(m_pdhStatus, m_searchInstance));
+        }
+
+        // Specify a counter object with a wildcard for the instance.
+        if (m_pdhStatus = PdhAddCounter(
+                m_pdhQuery,
+                m_searchInstance.c_str(),
+                0,
+                &m_pdhCounter)
+            )
+        {
+            GetErrorString(m_pdhStatus, m_searchInstance);
+            throw CException(GetErrorString(m_pdhStatus, m_searchInstance));
+        }
+
+        // TODO
         // If m_parentProcessPID <> 0
         //   Find process with Parent PID == m_parentProcessPID
         //   Track metrics on this only process
         // else
         //   Do whatether metrics prescribes
 
-        // Specify a counter object with a wildcard for the instance.
-        if (m_pdhStatus = PdhAddCounter(
-                m_pdhQuery,
-                m_counterPaths[0].c_str(), // TODO
-                0,
-                &m_pdhCounter)
-            )
+        for (int i = 0; i < m_processMetrics.size(); i++)
         {
-            GetErrorString(m_pdhStatus);
-            throw CException(GetErrorString(m_pdhStatus));
+            PDH_HQUERY pdhQuery;
+            PDH_STATUS pdhStatus;
+            PDH_HCOUNTER pdhCounter;
+
+            if (pdhStatus = PdhOpenQuery(NULL, 0, &pdhQuery))
+            {
+                throw CException(GetErrorString(pdhStatus, m_processMetrics[i]));
+            }
+
+            // Specify a counter object with a wildcard for the instance.
+            if (pdhStatus = PdhAddCounter(
+                    pdhQuery,
+                    m_processMetrics[i].c_str(),
+                    0,
+                    &pdhCounter)
+                )
+            {
+                GetErrorString(pdhStatus, m_processMetrics[i]);
+                throw CException(GetErrorString(pdhStatus, m_processMetrics[i]));
+            }
+
+            m_queries.push_back(pdhQuery);
+            m_counters.push_back(pdhCounter);
         }
     }
 
     //! Destructor. The counter and query handle will be closed.
     ~CPdhQuery()
     {
+        for (int i = 0; i < m_queries.size(); i++)
+        {
+            PdhCloseQuery(m_queries[i]);
+        }
+
+        m_counters.clear();
+
         m_pdhCounter = NULL;
         if (m_pdhQuery)
             PdhCloseQuery(m_pdhQuery);
@@ -91,7 +142,7 @@ public:
             // detected, the while loop will retry.
             if (m_pdhStatus = PdhCollectQueryData(m_pdhQuery))
             {
-                throw CException(GetErrorString(m_pdhStatus));
+                throw CException(GetErrorString(m_pdhStatus, m_searchInstance));
             }
 
             // Size of the pItems buffer
@@ -117,7 +168,7 @@ public:
             // has failed.
             if (PDH_MORE_DATA != m_pdhStatus)
             {
-                throw CException(GetErrorString(m_pdhStatus));
+                throw CException(GetErrorString(m_pdhStatus, m_searchInstance));
             }
 
             std::vector<unsigned char> buffer(bufferSize);
@@ -138,7 +189,8 @@ public:
             tstring name;
             // Everything is good, mine the data.
             for (DWORD i = 0; i < itemCount; i++) {
-                name = tstring(pdhItems[i].szName);
+                //name = tstring(pdhItems[i].szName);
+                name = m_searchInstance;
 
                 // Add no after duplicate processes eg chrome, chrome#2
                 map<std::tstring, double>::iterator it;
@@ -155,13 +207,101 @@ public:
 
                 collectedData.insert(
                     std::make_pair(
-                        std::tstring(pdhItems[i].szName),
+                        name, //std::tstring(pdhItems[i].szName),
                         pdhItems[i].FmtValue.doubleValue)
                 );
             }
 
             pdhItems = NULL;
             bufferSize = itemCount = 0;
+
+
+
+
+            for (int i = 0; i < m_processMetrics.size(); i++)
+            {
+                PDH_STATUS pdhStatus;
+
+                // Collect the sampling data. This might cause
+                // PdhGetFormattedCounterArray to fail because some query type
+                // requires two collections (or more?). If such scenario is
+                // detected, the while loop will retry.
+                if (pdhStatus = PdhCollectQueryData(m_queries[i]))
+                {
+                    throw CException(GetErrorString(pdhStatus, m_processMetrics[i]));
+                }
+
+                // Size of the pItems buffer
+                DWORD bufferSize = 0;
+
+                // Number of items in the pItems buffer
+                DWORD itemCount = 0;
+
+                PDH_FMT_COUNTERVALUE_ITEM* pdhItems = NULL;
+
+                // Call PdhGetFormattedCounterArray once to retrieve the buffer
+                // size and item count. As long as the buffer size is zero, this
+                // function should return PDH_MORE_DATA with the appropriate
+                // buffer size.
+                pdhStatus = PdhGetFormattedCounterArray(
+                    m_counters[i],
+                    PDH_FMT_DOUBLE,
+                    &bufferSize,
+                    &itemCount,
+                    pdhItems);
+
+                // If the returned value is nto PDH_MORE_DATA, the function
+                // has failed.
+                if (PDH_MORE_DATA != pdhStatus)
+                {
+                    throw CException(GetErrorString(pdhStatus, m_processMetrics[i]));
+                }
+
+                std::vector<unsigned char> buffer(bufferSize);
+                pdhItems = (PDH_FMT_COUNTERVALUE_ITEM*)(&buffer[0]);
+
+                pdhStatus = PdhGetFormattedCounterArray(
+                    m_counters[i],
+                    PDH_FMT_DOUBLE,
+                    &bufferSize,
+                    &itemCount,
+                    pdhItems);
+
+                if (ERROR_SUCCESS != pdhStatus)
+                {
+                    continue;
+                }
+
+                tstring name = m_processMetrics[i];
+                // Everything is good, mine the data.
+                for (DWORD i = 0; i < itemCount; i++) 
+                {
+                    //name += tstring(pdhItems[i].szName);
+
+                    // Add no after duplicate processes eg chrome, chrome#2
+                    map<std::tstring, double>::iterator it;
+                    it = collectedData.find(name);
+                    u_int count = 2;
+                    string appData = "";
+                    wstring tmp;
+                    while (it != collectedData.end()) {
+                        appData = "#" + to_string(count);
+                        count++;
+                        tmp = tstring(appData.begin(), appData.end());
+                        it = collectedData.find(name + tmp);
+                    }
+
+                    collectedData.insert(
+                        std::make_pair(
+                            name, //std::tstring(pdhItems[i].szName),
+                            pdhItems[i].FmtValue.doubleValue)
+                    );
+                }
+
+                pdhItems = NULL;
+                bufferSize = itemCount = 0;
+            }
+
             break;
         }
         return collectedData;
@@ -170,11 +310,11 @@ public:
 private:
     //! Helper function that translate the PDH error code into
     //! an useful message.
-    std::tstring GetErrorString(PDH_STATUS errorCode)
+    std::tstring GetErrorString(PDH_STATUS errorCode, tstring searchInstance)
     {
         HANDLE hPdhLibrary = NULL;
         LPTSTR pMessage = NULL;
-        DWORD_PTR pArgs[] = { (DWORD_PTR)m_searchInstance.c_str() };
+        DWORD_PTR pArgs[] = { (DWORD_PTR)searchInstance.c_str() };
         std::tstring errorString;
 
         hPdhLibrary = LoadLibrary(_T("pdh.dll"));
@@ -200,7 +340,7 @@ private:
         {
             std::tstringstream ss;
             ss
-                << m_counterPaths[0] // TODO
+                << searchInstance
                 << _T(" ")
                 << _T("Format message failed with ")
                 << std::hex
@@ -210,7 +350,7 @@ private:
         }
         else
         {
-            errorString += m_counterPaths[0]; // TODO
+            errorString += searchInstance;
             errorString += _T(" ");
             errorString += pMessage;
             LocalFree(pMessage);
