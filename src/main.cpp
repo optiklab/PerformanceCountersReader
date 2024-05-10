@@ -57,9 +57,9 @@ int main(int argc, char** argv)
     CAppSettings settings(configFilename);
     
     CWinServices winServices;
-    DWORD parentProcessPID = winServices.GetServicePID(settings.Get()->serviceName);
+    DWORD serviceAsssignedPID = winServices.GetServicePID(settings.Get()->serviceName);
 
-    tcout << settings.Get()->serviceName << " " << parentProcessPID << std::endl;
+    tcout << settings.Get()->serviceName << " " << serviceAsssignedPID << std::endl;
     tcout << " ################################################ " << std::endl;
 
     try
@@ -85,7 +85,7 @@ int main(int argc, char** argv)
             //tstring(L"\\Processor(*)\\% Processor Time")
             //tstring(_T("\\Processor(*)\\Interrupts/sec"))
             //tstring(L"\\Processor(_Total)\\Interrupts/sec")
-            parentProcessPID,
+            serviceAsssignedPID,
             settings.Get()->processName
         );
         for (int i = 0; i < 100; ++i)

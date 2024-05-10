@@ -18,7 +18,7 @@ using namespace std;
 class CPdhQuery
 {
 private:
-    DWORD m_parentProcessPID;
+    DWORD m_serviceAssignedPID;
 
     // Must have process metric
     std::tstring m_processName;
@@ -47,12 +47,12 @@ public:
     };
 
     //! Constructor
-    explicit CPdhQuery(vector<std::tstring> processMetrics, DWORD parentProcessPID, tstring processName)
+    explicit CPdhQuery(vector<std::tstring> processMetrics, DWORD serviceAssignedPID, tstring processName)
         : m_pdhQuery(NULL)
         , m_pdhStatus(ERROR_SUCCESS)
         , m_pdhCounter(NULL)
         , m_processMetrics(processMetrics)
-        , m_parentProcessPID(parentProcessPID)
+        , m_serviceAssignedPID(serviceAssignedPID)
         , m_processName(processName)
     {
         m_searchInstance = _T("\\Process(") + m_processName + _T(")\\ID Process");
@@ -214,9 +214,6 @@ public:
 
             pdhItems = NULL;
             bufferSize = itemCount = 0;
-
-
-
 
             for (int i = 0; i < m_processMetrics.size(); i++)
             {
