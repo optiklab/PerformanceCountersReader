@@ -44,3 +44,26 @@ Code to measure CPU load in Windows ...
 ```
 
 All you need to do is include the pdh.lib in your project.
+
+# Reading list
+
+https://learn.microsoft.com/en-us/windows/win32/perfctrs/using-the-pdh-functions-to-consume-counter-data
+
+https://learn.microsoft.com/en-us/windows/win32/perfctrs/specifying-a-counter-path
+
+Process Object: Core Services | Microsoft Learn
+https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc780836(v=ws.10)
+
+Memory Object
+https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc778082(v=ws.10)
+
+https://learn.microsoft.com/en-us/windows/win32/apiindex/windows-api-list
+
+https://learn.microsoft.com/en-us/windows/win32/services/service-record-list
+
+
+
+
+
+
+

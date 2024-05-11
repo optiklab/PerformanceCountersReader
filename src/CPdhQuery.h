@@ -205,6 +205,9 @@ public:
                     it = collectedData.find(name + tmp);
                 }
 
+                if ((DWORD)pdhItems[i].FmtValue.doubleValue != m_serviceAssignedPID)
+                    break;
+
                 collectedData.insert(
                     std::make_pair(
                         name, //std::tstring(pdhItems[i].szName),
@@ -212,11 +215,11 @@ public:
                 );
             }
 
-            pdhItems = NULL;
-            bufferSize = itemCount = 0;
-
             for (int i = 0; i < m_processMetrics.size(); i++)
             {
+                pdhItems = NULL;
+                bufferSize = itemCount = 0;
+
                 PDH_STATUS pdhStatus;
 
                 // Collect the sampling data. This might cause
